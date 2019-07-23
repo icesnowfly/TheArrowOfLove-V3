@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 
-function Arrow(spriteTexture, Cupid, cosT, sinT, speed, bounceNum, isFire) {
+function Arrow(PlatformSet,spriteTexture, Cupid, cosT, sinT, speed, bounceNum, isFire) {
     this.kHit = "assets/AudioTest/Hit.mp3";
 
     var w = 15;
@@ -28,11 +28,14 @@ function Arrow(spriteTexture, Cupid, cosT, sinT, speed, bounceNum, isFire) {
     this.mHalfLength = w/2;
     this.mTimes = bounceNum;
     this.mIsFire = isFire;
+    this.mIsFireHit = false;
+
+    this.mIsBoyHit = false;
+    this.mIsGirlHit = false;
 
     GameObject.call(this, this.mArrow);
     
-    var r;
-    r = new RigidRectangle(this.getXform(), w, h);
+    var r = new RigidRectangle(this.getXform(), w, h);
     this.mSpeedX = cosT * speed;
     this.mSpeedY = sinT * speed;
     r.setVelocity(this.mSpeedX, this.mSpeedY);
@@ -44,17 +47,25 @@ function Arrow(spriteTexture, Cupid, cosT, sinT, speed, bounceNum, isFire) {
     var headY = this.mHalfLength * Math.sin(radian);
     this.mFire.setPos(xform.getXPos()+headX,xform.getYPos()+headY);
 
-    r.mXform.setRotationInRad(bowXform.getRotationInRad());
-    r.setMass(1);
-    r.setRestitution(0);
     this.setRigidBody(r);
-  //this.toggleDrawRenderable();
-    this.toggleDrawRigidShape();
+    this.getRigidBody().mXform.setRotationInRad(bowXform.getRotationInRad());
+    this.getRigidBody().setMass(1);
+    this.getRigidBody().setRestitution(0);
+
+    var info = new CollisionInfo();
+    for (var i=0;i<PlatformSet.size();i++) {
+        if (this.getRigidBody().collisionTest(PlatformSet.getObjectAt(i).getRigidBody(), info)) {
+            this.mIsHit = true;
+        }
+    }
+
+    //this.toggleDrawRenderable();
+    //this.toggleDrawRigidShape();
 }
 gEngine.Core.inheritPrototype(Arrow, GameObject);
 
 Arrow.prototype.draw = function(aCamera){
-    this.mArrow.draw(aCamera);
+    GameObject.prototype.draw.call(this,aCamera);
     if (this.mIsFire)
         this.mAllFire.draw(aCamera);
 };
@@ -63,6 +74,7 @@ Arrow.prototype.update = function (World) {
     var xform = this.getXform();
     var hitPosition = new vec2.create();
     var PlatformSet = World.mPlatformSet;
+    var ButtonSet = World.mButtonSet;
 
     gEngine.ParticleSystem.update(this.mAllFire);
 
@@ -85,34 +97,44 @@ Arrow.prototype.update = function (World) {
         var touchX = this.getXform().getXPos() + 7.5 * tempx / Math.sqrt(tempx * tempx + tempy * tempy);
         var touchY = this.getXform().getYPos() + 7.5 * tempy / Math.sqrt(tempx * tempx + tempy * tempy);
         var xmin = tempxf.getXPos() - tempxf.getWidth()/2;
-        var xmax = tempxf.getXPos() + tempxf.getWidth()/2
-        var ymin = tempxf.getYPos() - tempxf.getHeight()/2
+        var xmax = tempxf.getXPos() + tempxf.getWidth()/2;
+        var ymin = tempxf.getYPos() - tempxf.getHeight()/2;
         var ymax = tempxf.getYPos() + tempxf.getHeight()/2;
 
         if(touchX > tempxf.getXPos() - tempxf.getWidth()/2
             && touchX < tempxf.getXPos() + tempxf.getWidth()/2
             && touchY > tempxf.getYPos() - tempxf.getHeight()/2
-            && touchY < tempxf.getYPos() + tempxf.getHeight()/2){
+            && touchY < tempxf.getYPos() + tempxf.getHeight()/2)
+        {
             if(this.mTimes > 0){
                 this.mTimes--;
                 var disx = (touchX - xmin > xmax - touchX)?(xmax - touchX) : (touchX - xmin);
                 var disy = (touchY- ymin > ymax - touchY)?(ymax - touchY) : (touchY - ymin);
                 if(disx < disy)
-                    this.getRigidBody().setVelocity(-this.getRigidBody().getVelocity()[0], this.getRigidBody().getVelocity()[1]);
+                    this.getRigidBody().setVelocity(-this.getRigidBody().getVelocity()[0] * 0.8, this.getRigidBody().getVelocity()[1] * 0.8);
                 else
-                    this.getRigidBody().setVelocity(this.getRigidBody().getVelocity()[0], -this.getRigidBody().getVelocity()[1]);
+                    this.getRigidBody().setVelocity(this.getRigidBody().getVelocity()[0] * 0.8, -this.getRigidBody().getVelocity()[1] * 0.8);
+                gEngine.AudioClips.playACue(this.kHit);
             }
             else {
                 this.mIsHit = true;
-                gEngine.AudioClips.playACue(this.kHit);
             }
         }
-        //if (this.getBBox().intersectsBound(PlatformSet.getObjectAt(i).getBBox()))
-        //if (this.pixelTouches(PlatformSet.getObjectAt(i),hitPosition))
+    }
+    //Deal with the button events
+    for (i=0;i<ButtonSet.size();i++)
+    {
+        if (this.getRigidBody().collisionTest(ButtonSet.getObjectAt(i).getRigidBody(),info))
+        {
+            ButtonSet.getObjectAt(i).toggleSwitch();
+            ButtonSet.getObjectAt(i).controlPlatform(PlatformSet);
+            this.mIsHit = true;
+        }
     }
 
-    if (xform.getXPos()>300 || xform.getXPos()<-100 || xform.getYPos()>250 || xform.getYPos()<-100 || this.mIsHit) //Out of the world bound
+    if (xform.getYPos()<-100 || this.mIsHit) //Out of the world bound
     {
+        gEngine.AudioClips.playACue(this.kHit);
         this.mIsDead = true;
     }
 
@@ -125,4 +147,28 @@ Arrow.prototype.getIsFire = function () {
 
 Arrow.prototype.setIsFire = function (flag) {
     this.mIsFire = flag;
+}
+
+Arrow.prototype.getIsFireHit = function () {
+    return this.mIsFireHit;
+}
+
+Arrow.prototype.setIsFireHit = function (flag) {
+    this.mIsFireHit = flag;
+}
+
+Arrow.prototype.setIsBoyHit = function (flag) {
+    this.mIsBoyHit = flag;
+}
+
+Arrow.prototype.setIsGirlHit = function (flag) {
+    this.mIsGirlHit = flag;
+}
+
+Arrow.prototype.getIsBoyHit = function (flag) {
+    return this.mIsBoyHit;
+}
+
+Arrow.prototype.getIsGirlHit = function (flag) {
+    return this.mIsGirlHit;
 }

@@ -88,7 +88,7 @@ GameObject.prototype.toggleDrawRigidShape = function() {
 GameObject.prototype.update = function () {
     // simple default behavior
     if (this.mRigidBody !== null)
-            this.mRigidBody.update();
+        this.mRigidBody.update();
 };
 
 GameObject.prototype.draw = function (aCamera) {

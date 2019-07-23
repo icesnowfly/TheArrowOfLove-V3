@@ -31,7 +31,7 @@ function Cupid(spriteTexture, aCamera, x, y, PlatformSet) {
     this.mBarVisible = false;
 
     this.mG = -0.1;
-    this.mf = -0.2;
+    this.mf = -0.5;
     this.mSpeedX = 0;
     this.mSpeedY = 0;
 
@@ -42,12 +42,6 @@ function Cupid(spriteTexture, aCamera, x, y, PlatformSet) {
     this.mIsFire = false;
 
     GameObject.call(this,this.mCupid);
-
-    // this.mRigidBody = new RigidRectangle(this.mCupid.getXform(),w,h);
-    // this.mRigidBody.setRestitution(0);
-    // this.setRigidBody(this.mRigidBody);
-    // this.mRigidBody.setRestitution(0);
-    // this.toggleDrawRigidShape();
 }
 gEngine.Core.inheritPrototype(Cupid,GameObject);
 
@@ -66,17 +60,13 @@ Cupid.prototype.update = function(World){
     var PlatformSet = World.mPlatformSet;
     var temp = this.mDirection;
 
-    //Update the Cupid's position
-    xform.incXPosBy(this.mSpeedX);
-    xform.incYPosBy(this.mSpeedY);
-
     //Reset the Cupid's position
-    if (gEngine.Input.isKeyClicked(gEngine.Input.keys.R))
-    {
-        xform.setPosition(60,50);
-        this.mSpeedX = 0;
-        this.mSpeedY = 0;
-    }
+    // if (gEngine.Input.isKeyClicked(gEngine.Input.keys.R))
+    // {
+    //     xform.setPosition(60,50);
+    //     this.mSpeedX = 0;
+    //     this.mSpeedY = 0;
+    // }
 
     //Move Left and Right
     if (gEngine.Input.isKeyPressed(gEngine.Input.keys.A))
@@ -93,12 +83,16 @@ Cupid.prototype.update = function(World){
     if (!this.mOnPlatform)
         this.mSpeedY += this.mG;
 
+    //Update the Cupid's position
+    xform.incXPosBy(this.mSpeedX);
+    xform.incYPosBy(this.mSpeedY);
+
     //Jump
     if (gEngine.Input.isKeyClicked(gEngine.Input.keys.Space) && !this.mIsInAir)
     {
         this.mSpeedY = 3;
-        var speed = PlatformSet.getObjectAt(this.mOnPlatformID).getSpeed();
-        xform.setYPos(xform.getYPos()+ speed + this.kDelta);
+        var speedJump = PlatformSet.getObjectAt(this.mOnPlatformID).getSpeed();
+        xform.setYPos(xform.getYPos()+ speedJump + this.kDelta);
         this.mIsInAir = true;
         this.mOnPlatform = false;
     }
@@ -107,41 +101,13 @@ Cupid.prototype.update = function(World){
     if (this.mOnPlatform) {
         //Fix the Cupid on the platform
         xform.setYPos(PlatformSet.getObjectAt(this.mOnPlatformID).getBBox().maxY() + this.mCH);
+        if (PlatformSet.getObjectAt(this.mOnPlatformID).mIsMove && PlatformSet.getObjectAt(this.mOnPlatformID).mMoveDirection === 1)
+            xform.setXPos(xform.getXPos() + PlatformSet.getObjectAt(this.mOnPlatformID).mMoveSpeed * PlatformSet.getObjectAt(this.mOnPlatformID).mDirection);
         if (b.maxX() < PlatformSet.getObjectAt(this.mOnPlatformID).getBBox().minX()
             || b.minX() > PlatformSet.getObjectAt(this.mOnPlatformID).getBBox().maxX()) {
             this.mOnPlatform = false;
         }
     }
-    //Deal with the collision
-    // for (var i = 0; i < PlatformSet.size(); i++) {
-    //     var status = this.getBBox().enterCollideStatus(PlatformSet.getObjectAt(i).getBBox(),this.mSpeedX,this.mSpeedY,this.mPC[i]);
-    //     //On the top of platforms
-    //     if (status === 1 || status === 5 || status === 9 || status === 16) {
-    //         this.mOnPlatformID = i;
-    //         this.mOnPlatform = true;
-    //         xform.setYPos(PlatformSet.getObjectAt(i).getBBox().maxY() + this.mCH + this.kDelta);
-    //         if (!this.mIsInAir) this.mSpeedY = 0;
-    //         this.mIsInAir = false;
-    //     }
-    //     //At the bottom of platforms
-    //     if (status === 2 || status === 6 || status === 10 || status === 17) {
-    //         xform.setYPos(PlatformSet.getObjectAt(i).getBBox().minY() - this.mCH - this.kDelta);
-    //         this.mSpeedY = 0;
-    //     }
-    //     //At the right of platforms
-    //     if (status === 4 || status === 5 || status === 6){
-    //         xform.setXPos(PlatformSet.getObjectAt(i).getBBox().maxX() + this.mCW + this.kDelta);
-    //         this.mSpeedX = 0;
-    //     }
-    //     //At the left of platforms
-    //     if (status === 8 || status === 9 || status === 10) {
-    //         xform.setXPos(PlatformSet.getObjectAt(i).getBBox().minX() - this.mCW - this.kDelta);
-    //         this.mSpeedX = 0;
-    //     }
-    //     if (status !== 0)
-    //         this.mPC[i] = true;
-    //     else this.mPC[i] = false;
-    // }
 
     //Deal with the collision
     for (var i = 0; i < PlatformSet.size(); i++) {
@@ -159,6 +125,7 @@ Cupid.prototype.update = function(World){
         if (status === 2) {
             xform.setYPos(PlatformSet.getObjectAt(i).getBBox().minY() - this.mCH);
             this.mSpeedY = 0;
+            this.mOnPlatform = false;
         }
         //At the right of platforms
         if (status === 4) {
@@ -224,8 +191,11 @@ Cupid.prototype.update = function(World){
                 gEngine.AudioClips.playACue(this.kArrowslow);
             else gEngine.AudioClips.playACue(this.kArrowfast);
             if (gEngine.Input.isButtonReleased(gEngine.Input.mouseButton.Right)) bounceNum = 3;
-            var arrow = new Arrow(this.kTexture, this, cosT, sinT, this.mSpeedCount * 5, this.mBounceNum, this.mIsFire);
+            var arrow = new Arrow(PlatformSet,this.kTexture, this, cosT, sinT, this.mSpeedCount * 5, this.mBounceNum, this.mIsFire);
             this.mArrowSet.addToSet(arrow);
+            if (this.mBounceNum>0) World.incBounceSum();
+            if (this.mIsFire) World.incFireSum();
+            if (!this.mIsFire && this.mBounceNum === 0) World.incNormalSum();
         }
         this.mSpeedCount = 0;
         this.mCrosshair.setColor([0,0,0,1]);
@@ -243,5 +213,13 @@ Cupid.prototype.update = function(World){
 
     GameObject.prototype.update.call(this);
     this.mArrowSet.update(World);
+}
 
+Cupid.prototype.getCurrentArrow = function () {
+    var type = 0;
+    if (this.mIsFire)
+        type += 1;
+    if (this.mBounceNum>0)
+        type += 2;
+    return type;
 }
